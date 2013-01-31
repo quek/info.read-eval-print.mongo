@@ -2,7 +2,7 @@
 
 (defpackage #:info.read-eval-print.mongo
   (:use #:cl #:info.read-eval-print.bson)
-  (:shadow #:find)
+  (:shadow #:delete #:find)
   (:export #:connect
            #:db
            #:collection

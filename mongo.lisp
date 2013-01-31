@@ -126,6 +126,21 @@
             (fast-io:fast-write-sequence data out)))
     (values)))
 
+(defmethod delete ((collection collection) &optional selector &key single-remove)
+  (declare #+sbcl(sb-ext:muffle-conditions sb-kernel:redefinition-warning))
+  (let ((flag (logior (if single-remove #b1 0)))
+        (full-collection-name (full-collection-name collection))
+        (selector (encode (if selector selector (bson)))))
+    (send (connection collection)
+          +op-delete+
+          (+ 4 (length full-collection-name) 4 (length selector))
+          (lambda (out)
+            (fast-io:write32-le 0 out)
+            (fast-io:fast-write-sequence full-collection-name out)
+            (fast-io:write32-le flag out)
+            (fast-io:fast-write-sequence selector out)))
+    (values)))
+
 (defmethod next ((cursor cursor))
   (with-slots (documents) cursor
     (if documents
