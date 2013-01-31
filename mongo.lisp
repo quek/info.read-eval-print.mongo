@@ -143,10 +143,12 @@
     documents))
 
 (defmethod refresh ((cursor cursor))
-  (with-slots (query-run-p cursor-id) cursor
+  (with-slots (query-run-p cursor-id documents-count limit) cursor
     (if query-run-p
-        (unless (zerop cursor-id)
-          (send-get-more cursor))
+        (if (and (not (zerop cursor-id))
+                 (or (zerop limit)
+                     (< documents-count limit)))
+            (send-get-more cursor))
         (send-inital-query cursor))))
 
 (defmethod send-inital-query ((cursor cursor))

@@ -6,11 +6,13 @@
 
 (in-package :info.read-eval-print.mongo.test)
 
+#+nil
 (with-connection (connection)
   (let* ((db (db connection "test"))
          (collection (collection db "test")))
     (insert collection (bson "ぬぬも" "ぬもも"))))
 
+#+nil
 (with-connection (connection)
   (let* ((db (db connection "test"))
          (collection (collection db "test")))
@@ -25,9 +27,13 @@
 (with-connection (connection)
   (let* ((db (db connection "test"))
          (collection (collection db "test")))
-    #+nil
-    (loop for i from 1 to 30000
-          do (insert collection (bson "foo" i)))
-    (with-open-stream (cursor (find collection))
-      (loop while (next-p cursor)
-            collect (next cursor)))))
+    (loop for i from 1 to 10000
+          do (insert collection (bson "foo" i)))))
+
+(with-connection (connection)
+  (let* ((db (db connection "test"))
+         (collection (collection db "test")))
+    (with-open-stream (cursor (find collection nil))
+      (length
+       (loop while (next-p cursor)
+             collect (next cursor))))))
