@@ -14,5 +14,8 @@
            #:next
            #:next-p
 
+           #:command
+           #:stats
+
            #:$set))
 

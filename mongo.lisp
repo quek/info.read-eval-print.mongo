@@ -91,8 +91,14 @@
        (close ,var))))
 
 
-(defmethod db ((connection connection) name)
+(defgeneric db (thing &optional name))
+
+(defmethod db ((connection connection) &optional name)
   (make-instance 'db :name name :connection connection))
+
+(defmethod db ((collection collection) &optional name)
+  (declare (ignore name))
+  (slot-value collection 'db))
 
 (defmethod collection ((db db) name)
   (make-instance 'collection :name name :db db))
@@ -305,3 +311,17 @@
               (fast-io:write32-le 0 out)
               (fast-io:write32-le 1 out)
               (fast-io:write64-le cursor-id out))))))
+
+
+
+(defmethod stats ((db db))
+  (command db (bson :dbstats 1)))
+
+(defmethod command ((db db) selector &key)
+  (find-one (collection db "$cmd") selector))
+
+#+nil
+(with-connection (connection)
+  (stats (db connection "test")))
+;;⇒ {"db": "test", "collections": 4, "objects": 10, "avgObjSize": 38.8d0, "dataSize": 388, "storageSize": 11268096, "numExtents": 10, "indexes": 2, "indexSize": 16352, "fileSize": 201326592, "nsSizeMB": 16, "ok": 1.0d0}
+
