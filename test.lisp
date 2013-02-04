@@ -57,6 +57,8 @@
       (is (= 1 (length docs)))
       (is (string= (value (car docs) "foo") "bar"))
       (is (string= (value (car docs) "ba") "po")))
+    (let ((doc (find-one collection (bson "ba" "po"))))
+      (is (string= (value doc "ba") "po")))
     (delete collection (bson "foo" "bar"))
     (let ((docs (loop with cursor = (find collection)
                       while (next-p cursor)

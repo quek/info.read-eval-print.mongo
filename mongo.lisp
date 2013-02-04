@@ -286,6 +286,14 @@
                  :exhaust exhaust
                  :partial partial))
 
+(defmethod find-one ((collection collection) &optional (query (bson)))
+  (let ((cursor (make-instance 'cursor
+                               :collection collection
+                               :query query
+                               :limit -1)))
+    (if (next-p cursor)
+        (next cursor))))
+
 (defmethod close ((cursor cursor) &key abort)
   (declare (ignore abort))
   (with-slots (cursor-id collectio) cursor

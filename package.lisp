@@ -10,6 +10,7 @@
            #:update
            #:with-connection
            #:find
+           #:find-one
            #:next
            #:next-p
 
