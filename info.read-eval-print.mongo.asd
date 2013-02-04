@@ -6,6 +6,7 @@
   :author "TAHARA Yoshinori <read.eval.print@gmail.com"
   :license "BSD Licence"
   :components ((:file "package")
+               (:file "operator")
                (:file "mongo"))
   :depends-on (:info.read-eval-print.bson :iolib))
 
