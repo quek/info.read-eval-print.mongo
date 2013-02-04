@@ -7,8 +7,11 @@
            #:db
            #:collection
            #:insert
+           #:update
            #:with-connection
            #:find
            #:next
-           #:next-p))
+           #:next-p
+
+           #:$set))
 
