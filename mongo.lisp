@@ -48,9 +48,9 @@
    (await-data            :initarg  :await-data            :initform nil)
    (exhaust               :initarg  :exhaust               :initform nil)
    (partial               :initarg  :partial               :initform nil)
-   (cursor-id :initform 0)
+   (cursor-id             :initform 0)
    (documents             :initform nil)
-   (documents-count :initform 0)
+   (documents-count       :initform 0)
    (query-run-p           :initform nil)))
 
 (defmethod connection ((cursor cursor))
@@ -179,7 +179,11 @@
   (with-slots (documents) cursor
     (unless documents
       (refresh cursor))
-    documents))
+    (if documents
+        t
+        (progn
+          (close cursor)
+          nil))))
 
 (defmethod refresh ((cursor cursor))
   (with-slots (query-run-p cursor-id documents-count limit) cursor
@@ -262,7 +266,27 @@
                                        "$showDiskLoc" "$maxScan" "$returnKey" "$comment")
                           thereis (value query key)))
          query
-         (bson "$query" query)))))
+         (let ((bson (bson "$query" query)))
+           (when sort
+             (setf (value bson "$orderby") (sort-bson sort)))
+           bson)))))
+
+(defun sort-bson (sort)
+  "sort is x or (x y) or (x :desc y z :desc)"
+  (let ((bson (bson)))
+    (labels ((f (arg)
+               (cond ((null arg)
+                      bson)
+                     ((atom arg)
+                      (setf (value bson arg) 1)
+                      bson)
+                     ((eq :desc (cadr arg))
+                      (setf (value bson (car arg)) -1)
+                      (f (cddr arg)))
+                     (t
+                      (setf (value bson (car arg)) 1)
+                      (f (cdr arg))))))
+      (f sort))))
 
 (defmethod make-return-field-selector-data ((cursor cursor))
   (with-slots (return-field-selector) cursor
@@ -303,14 +327,15 @@
 (defmethod close ((cursor cursor) &key abort)
   (declare (ignore abort))
   (with-slots (cursor-id collectio) cursor
-    (when cursor-id
+    (unless (zerop cursor-id)
       (send (connection cursor)
             +op-kill-cursors+
             (+ 4 4 4)
             (lambda (out)
               (fast-io:write32-le 0 out)
               (fast-io:write32-le 1 out)
-              (fast-io:write64-le cursor-id out))))))
+              (fast-io:write64-le cursor-id out)))
+      (setf cursor-id 0))))
 
 
 

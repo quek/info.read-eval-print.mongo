@@ -17,5 +17,7 @@
            #:command
            #:stats
 
-           #:$set))
+           #:$set
+
+           #:scan-mongo))
 

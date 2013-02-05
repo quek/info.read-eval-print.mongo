@@ -7,6 +7,7 @@
   :license "BSD Licence"
   :components ((:file "package")
                (:file "operator")
-               (:file "mongo"))
-  :depends-on (:info.read-eval-print.bson :iolib))
+               (:file "mongo")
+               (:file "series"))
+  :depends-on (:info.read-eval-print.bson :iolib :series))
 

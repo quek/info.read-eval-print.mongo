@@ -3,7 +3,7 @@
   (ql:quickload :fiveam))
 
 (defpackage :info.read-eval-print.mongo.test
-  (:use :cl :info.read-eval-print.mongo :info.read-eval-print.bson :fiveam)
+  (:use :cl :info.read-eval-print.mongo :info.read-eval-print.bson :fiveam :series)
   (:shadowing-import-from :info.read-eval-print.mongo #:delete #:find)
   (:import-from :fiveam #:def-suite*))
 
@@ -14,7 +14,7 @@
 (defparameter *test-port* 27077)
 
 (defun run-test-mongod ()
-  (asdf:run-shell-command "rm -r ~a" *test-db-dir*)
+  (asdf:run-shell-command "rm -rf ~a" *test-db-dir*)
   (ensure-directories-exist (concatenate 'string *test-db-dir* "/"))
   (let ((asdf::*verbose-out* *terminal-io*))
     (asdf:run-shell-command
@@ -63,7 +63,16 @@
     (let ((docs (loop with cursor = (find collection)
                       while (next-p cursor)
                       collect (next cursor))))
-      (is (null docs)))))
+      (is (null docs)))
+
+    (loop for i from 1 to 10
+          do (insert collection (bson "test" "sort" "value" i)))
+    (let ((xs (collect (scan-mongo collection (bson "test" "sort") :sort "value"))))
+      (is (= 1 (value (car xs) "value")))
+      (is (= 10 (value (car (last xs)) "value"))))
+    (let ((xs (collect (scan-mongo collection (bson "test" "sort") :sort '("value" :desc)))))
+      (is (= 10 (value (car xs) "value")))
+      (is (= 1 (value (car (last xs)) "value"))))))
 
 (test test-command
   (with-test-collection (collection)
