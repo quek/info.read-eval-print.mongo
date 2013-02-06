@@ -9,5 +9,5 @@
                (:file "operator")
                (:file "mongo")
                (:file "series"))
-  :depends-on (:info.read-eval-print.bson :iolib :series))
+  :depends-on (:info.read-eval-print.bson :iolib :parenscript :series))
 

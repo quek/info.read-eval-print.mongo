@@ -386,3 +386,17 @@
     (when verbose
       (setf (value bson "verbose") verbose))
     (command collection bson)))
+
+(defmethod map-reduce (collection (map list) reduce
+                       &rest args &key &allow-other-keys)
+  (apply #'map-reduce collection
+         (make-instance 'javascript-code :code (string-trim '(#\( #\) #\;) (parenscript:ps* map)))
+         reduce
+         args))
+
+(defmethod map-reduce (collection map (reduce list)
+                       &rest args &key &allow-other-keys)
+  (apply #'map-reduce collection
+         map
+         (make-instance 'javascript-code :code (string-trim '(#\( #\) #\;) (parenscript:ps* reduce)))
+         args))

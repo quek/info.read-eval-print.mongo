@@ -3,7 +3,7 @@
   (ql:quickload :fiveam))
 
 (defpackage :info.read-eval-print.mongo.test
-  (:use :cl :info.read-eval-print.mongo :info.read-eval-print.bson :fiveam :series)
+  (:use :cl :info.read-eval-print.mongo :info.read-eval-print.bson :fiveam :series :parenscript)
   (:shadowing-import-from :info.read-eval-print.mongo #:delete #:find)
   (:import-from :fiveam #:def-suite*))
 
@@ -101,12 +101,13 @@
   (with-test-collection (c)
     (loop for cust-id from 1 to 10
           do (loop for price from 10 to 20 by 10
-                   do (insert c (bson "cust_id" cust-id "price" (* price cust-id)))))
-    (map-reduce
-     c
-     (make-instance 'javascript-code :code "function(){emit(this.cust_id, this.price);}")
-     (make-instance 'javascript-code :code "function(cust_id, prices){return Array.sum(prices);}")
-     :out "hoge")
+                   do (insert c (bson "custId" cust-id "price" (* price cust-id)))))
+    (map-reduce c
+                '(lambda ()
+                  (emit (@ this cust-id) (@ this price)))
+                '(lambda (cust-id prices)
+                  (chain *array (sum prices)))
+                :out "hoge")
     (let ((hoge (collection *test-db* "hoge")))
       (is (= 10 (length (find-all hoge))))
       (loop for cust-id from 1 to 10
