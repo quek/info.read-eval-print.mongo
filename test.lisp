@@ -23,7 +23,7 @@
      *test-mongod* *test-db-dir* *test-port* *test-db-dir* *test-db-dir*)))
 
 (defun kill-test-mongod ()
-  (asdf:run-shell-command "kill `cat ~a/mongod.pid`" *test-db-dir*))
+  (asdf:run-shell-command "kill `pgrep -f '~a .* --port ~a'`" *test-mongod* *test-port*))
 
 (defmacro with-test-mongod (&body body)
   `(unwind-protect
@@ -96,6 +96,23 @@
       (is (string= "test" (value stats :db)))
       (is (value stats :collections))
       (is (value stats :objects)))))
+
+(test map-reduce
+  (with-test-collection (c)
+    (loop for cust-id from 1 to 10
+          do (loop for price from 10 to 20 by 10
+                   do (insert c (bson "cust_id" cust-id "price" (* price cust-id)))))
+    (map-reduce
+     c
+     (make-instance 'javascript-code :code "function(){emit(this.cust_id, this.price);}")
+     (make-instance 'javascript-code :code "function(cust_id, prices){return Array.sum(prices);}")
+     :out "hoge")
+    (let ((hoge (collection *test-db* "hoge")))
+      (is (= 10 (length (find-all hoge))))
+      (loop for cust-id from 1 to 10
+            for price = (* 30 cust-id)
+            do (is (= price
+                      (value (find-one hoge (bson :_id cust-id)) :value)))))))
 
 (with-test-db
   (debug!))

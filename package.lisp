@@ -11,6 +11,7 @@
            #:with-connection
            #:find
            #:find-one
+           #:find-all
            #:next
            #:next-p
 
@@ -18,6 +19,8 @@
            #:stats
 
            #:$set
+
+           #:map-reduce
 
            #:scan-mongo))
 

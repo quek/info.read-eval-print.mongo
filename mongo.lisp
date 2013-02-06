@@ -28,11 +28,11 @@
    (stream)))
 
 (defclass db ()
-  ((name :initarg :name)
+  ((name :initarg :name :reader name)
    (connection :initarg :connection :reader connection)))
 
 (defclass collection ()
-  ((name :initarg :name)
+  ((name :initarg :name :reader name)
    (db :initarg :db)))
 
 (defclass cursor ()
@@ -355,8 +355,29 @@
 (defmethod command ((db db) selector &key)
   (find-one (collection db "$cmd") selector))
 
-#+nil
-(with-connection (connection)
-  (stats (db connection "test")))
-;;⇒ {"db": "test", "collections": 4, "objects": 10, "avgObjSize": 38.8d0, "dataSize": 388, "storageSize": 11268096, "numExtents": 10, "indexes": 2, "indexSize": 16352, "fileSize": 201326592, "nsSizeMB": 16, "ok": 1.0d0}
+(defmethod command ((collection collection) selector &rest args &key)
+  (apply #'command (db collection) selector args))
 
+
+(defmethod map-reduce ((collection collection) (map javascript-code) (reduce javascript-code)
+                       &key out query sort limit finalize scope js-mode verbose)
+  (let ((bson (bson "mapreduce" (name collection)
+                    "map" map
+                    "reduce" reduce)))
+    (when out
+      (setf (value bson "out") out))
+    (when query
+      (setf (value bson "query") query))
+    (when sort
+      (setf (value bson "sort") (sort-bson sort)))
+    (when limit
+      (setf (value bson "limit") limit))
+    (when finalize
+      (setf (value bson "finalize") finalize))
+    (when scope
+      (setf (value bson "scope") scope))
+    (when js-mode
+      (setf (value bson "js-mode") js-mode))
+    (when verbose
+      (setf (value bson "verbose") verbose))
+    (command collection bson)))
