@@ -32,15 +32,19 @@
           ,@body)
      (kill-test-mongod)))
 
+(defparameter *test-db* nil)
 
-(defmacro with-test-collection ((collection &optional (collection-name "cons")) &body body)
-  (let ((connection (gensym "connection"))
-        (db (gensym "db")))
+(defmacro with-test-db (&body body)
+  (let ((connection (gensym "connection")))
     `(with-test-mongod
        (with-connection (,connection :port *test-port*)
-         (let* ((,db (db ,connection "test"))
-                (,collection (collection ,db ,collection-name)))
-           ,@body)))))
+         (setf *test-db* (db ,connection "test"))
+         ,@body))))
+
+(defmacro with-test-collection ((collection &optional (collection-name "cons")) &body body)
+  `(let ((,collection (collection *test-db* ,collection-name)))
+     (delete ,collection)
+     ,@body))
 
 (def-suite all)
 
@@ -53,7 +57,6 @@
     (let ((docs (loop with cursor = (find collection)
                       while (next-p cursor)
                       collect (next cursor))))
-      (print docs)
       (is (= 1 (length docs)))
       (is (string= (value (car docs) "foo") "bar"))
       (is (string= (value (car docs) "ba") "po")))
@@ -63,8 +66,20 @@
     (let ((docs (loop with cursor = (find collection)
                       while (next-p cursor)
                       collect (next cursor))))
-      (is (null docs)))
+      (is (null docs)))))
 
+(test projection
+  (with-test-collection (c)
+    (insert c (bson :a 1 :b 2 :c 3))
+    (let ((x (find-one c nil '(:b :c (:_id)))))
+      (is (bson= (bson :b 2 :c 3) x)))
+    (let ((x (find-one c nil '((:_id) (:b)))))
+      (is (bson= x (bson :a 1 :c 3))))))
+
+(test sort
+  "find :sort"
+  (with-test-collection (collection)
+    (is (null (collect (scan-mongo collection nil))))
     (loop for i from 1 to 10
           do (insert collection (bson "test" "sort" "value" i)))
     (let ((xs (collect (scan-mongo collection (bson "test" "sort") :sort "value"))))
@@ -77,9 +92,10 @@
 (test test-command
   (with-test-collection (collection)
     (insert collection (bson "あいう" "まみむ"))
-    (let ((stats (print (stats (db collection)))))
+    (let ((stats (stats (db collection))))
       (is (string= "test" (value stats :db)))
       (is (value stats :collections))
       (is (value stats :objects)))))
 
-(debug!)
+(with-test-db
+  (debug!))

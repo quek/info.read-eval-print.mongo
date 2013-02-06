@@ -7,7 +7,7 @@
 (defconstant +op-msg+          1000 "generic msg command followed by a string")
 (defconstant +op-update+       2001 "update document")
 (defconstant +op-insert+       2002 "insert new document")
-;; (defconstant RESERVED        2003 "formerly used for OP_GET_BY_OID")
+(defconstant +op-reserved+     2003 "formerly used for OP_GET_BY_OID")
 (defconstant +op-query+        2004 "query a collection")
 (defconstant +op-get-more+     2005 "Get more data from a query. See Cursors")
 (defconstant +op-delete+       2006 "Delete documents")
@@ -36,22 +36,22 @@
    (db :initarg :db)))
 
 (defclass cursor ()
-  ((collection            :initarg  :collection)
-   (query                 :initarg  :query)
-   (skip                  :initarg  :skip                  :initform 0)
-   (limit                 :initarg  :limit                 :initform 0)
-   (sort                  :initarg  :sort                  :initform nil)
-   (return-field-selector :initarg  :return-field-selector :initform nil)
-   (tailable-cursor       :initarg  :tailable-cursor       :initform nil)
-   (slave-ok              :initarg  :slave-ok              :initform nil)
-   (no-cursor-timeout     :initarg  :no-cursor-timeout     :initform nil)
-   (await-data            :initarg  :await-data            :initform nil)
-   (exhaust               :initarg  :exhaust               :initform nil)
-   (partial               :initarg  :partial               :initform nil)
-   (cursor-id             :initform 0)
-   (documents             :initform nil)
-   (documents-count       :initform 0)
-   (query-run-p           :initform nil)))
+  ((collection        :initarg  :collection)
+   (query             :initarg  :query)
+   (skip              :initarg  :skip              :initform 0)
+   (limit             :initarg  :limit             :initform 0)
+   (sort              :initarg  :sort              :initform nil)
+   (projection        :initarg  :projection        :initform nil)
+   (tailable-cursor   :initarg  :tailable-cursor   :initform nil)
+   (slave-ok          :initarg  :slave-ok          :initform nil)
+   (no-cursor-timeout :initarg  :no-cursor-timeout :initform nil)
+   (await-data        :initarg  :await-data        :initform nil)
+   (exhaust           :initarg  :exhaust           :initform nil)
+   (partial           :initarg  :partial           :initform nil)
+   (cursor-id         :initform 0)
+   (documents         :initform nil)
+   (documents-count   :initform 0)
+   (query-run-p       :initform nil)))
 
 (defmethod connection ((cursor cursor))
   (with-slots (collection) cursor
@@ -108,8 +108,8 @@
 
 (defun write-utf-8 (string out &key null-terminate-p)
   (fast-io:fast-write-sequence
-           (babel:string-to-octets string :encoding :utf-8)
-           out)
+   (babel:string-to-octets string :encoding :utf-8)
+   out)
   (when null-terminate-p
     (fast-io:fast-write-byte 0 out)))
 
@@ -206,21 +206,21 @@
                         (if partial #b10000000 0)))
           (full-collection-name (full-collection-name collection))
           (query-data (make-query-data cursor))
-          (return-field-selector-data (make-return-field-selector-data cursor)))
+          (projection-data (make-projection-data cursor)))
       (let ((request-id
               (send (connection cursor)
                     +op-query+
                     (+ 4 (length full-collection-name) 4 4
                        (length query-data)
-                       (length return-field-selector-data))
+                       (length projection-data))
                     (lambda (out)
                       (fast-io:write32-le flag out)
                       (fast-io:fast-write-sequence full-collection-name out)
                       (fast-io:write32-le skip out)
                       (fast-io:write32-le limit out)
                       (fast-io:fast-write-sequence query-data out)
-                      (when return-field-selector-data
-                       (fast-io:fast-write-sequence return-field-selector-data out))))))
+                      (when projection-data
+                        (fast-io:fast-write-sequence projection-data out))))))
         (receive cursor request-id)))
     (setf query-run-p t)))
 
@@ -288,13 +288,17 @@
                       (f (cdr arg))))))
       (f sort))))
 
-(defmethod make-return-field-selector-data ((cursor cursor))
-  (with-slots (return-field-selector) cursor
-    (if return-field-selector
-        (encode (apply #'bson (mapcan (lambda (field) (list field 1)) return-field-selector))))))
+(defmethod make-projection-data ((cursor cursor))
+  (with-slots (projection) cursor
+    (if projection
+        (encode (apply #'bson (mapcan (lambda (field)
+                                        (if (atom field)
+                                            (list field 1)
+                                            (list (car field) 0)))
+                                      projection))))))
 
 (defmethod find ((collection collection) &optional (query (bson))
-                 &key (skip 0) (limit 0) sort return-field-selector
+                 &key (skip 0) (limit 0) sort projection
                    tailable-cursor
                    slave-ok
                    no-cursor-timeout
@@ -308,7 +312,7 @@
                  :skip skip
                  :limit limit
                  :sort sort
-                 :return-field-selector return-field-selector
+                 :projection projection
                  :tailable-cursor tailable-cursor
                  :slave-ok slave-ok
                  :no-cursor-timeout no-cursor-timeout
@@ -316,13 +320,19 @@
                  :exhaust exhaust
                  :partial partial))
 
-(defmethod find-one ((collection collection) &optional (query (bson)))
+(defmethod find-one ((collection collection) &optional (query (bson)) projection)
   (let ((cursor (make-instance 'cursor
                                :collection collection
                                :query query
-                               :limit -1)))
+                               :limit -1
+                               :projection projection)))
     (if (next-p cursor)
         (next cursor))))
+
+(defun find-all (collection &rest args)
+  (loop with cursor = (apply #'find collection args)
+        while (next-p cursor)
+        collect (next cursor)))
 
 (defmethod close ((cursor cursor) &key abort)
   (declare (ignore abort))
