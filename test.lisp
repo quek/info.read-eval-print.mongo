@@ -74,7 +74,7 @@
     (let ((x (find-one c nil '(:b :c (:_id)))))
       (is (bson= (bson :b 2 :c 3) x)))
     (let ((x (find-one c nil '((:_id) (:b)))))
-      (is (bson= x (bson :a 1 :c 3))))))
+      (is (bson= (bson :a 1 :c 3) x)))))
 
 (test sort
   "find :sort"

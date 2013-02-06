@@ -3,6 +3,8 @@
 (defgeneric next (cursor))
 (defgeneric next-p (cursor))
 
+(defvar *default-connection* nil)
+
 (defconstant +op-reply+        1    "Reply to a client request. responseTo is set")
 (defconstant +op-msg+          1000 "generic msg command followed by a string")
 (defconstant +op-update+       2001 "update document")
@@ -196,7 +198,7 @@
 
 (defmethod send-inital-query ((cursor cursor))
   (with-slots (tailable-cursor slave-ok no-cursor-timeout await-data exhaust partial
-               collection skip limit
+               collection skip limit projection
                cache query-run-p) cursor
     (let ((flag (logior (if tailable-cursor #b10 0)
                         (if slave-ok #b100 0)
@@ -206,7 +208,7 @@
                         (if partial #b10000000 0)))
           (full-collection-name (full-collection-name collection))
           (query-data (make-query-data cursor))
-          (projection-data (make-projection-data cursor)))
+          (projection-data (make-projection-bson projection)))
       (let ((request-id
               (send (connection cursor)
                     +op-query+
@@ -288,14 +290,14 @@
                       (f (cdr arg))))))
       (f sort))))
 
-(defmethod make-projection-data ((cursor cursor))
-  (with-slots (projection) cursor
-    (if projection
-        (encode (apply #'bson (mapcan (lambda (field)
-                                        (if (atom field)
-                                            (list field 1)
-                                            (list (car field) 0)))
-                                      projection))))))
+(defun make-projection-bson (projection)
+  (if projection
+      (encode (apply #'bson (mapcan (lambda (field)
+                                      (if (atom field)
+                                          (list field 1)
+                                          (list (car field) 0)))
+                                    projection)))))
+
 
 (defmethod find ((collection collection) &optional (query (bson))
                  &key (skip 0) (limit 0) sort projection
@@ -320,12 +322,15 @@
                  :exhaust exhaust
                  :partial partial))
 
-(defmethod find-one ((collection collection) &optional (query (bson)) projection)
-  (let ((cursor (make-instance 'cursor
-                               :collection collection
-                               :query query
-                               :limit -1
-                               :projection projection)))
+(defmethod find ((collection string) &optional (query (bson))
+                 &rest args &key &allow-other-keys)
+  (unless *default-connection*
+    (setf *default-connection* (connect)))
+  (ppcre:register-groups-bind (db collection) ("([^.]+)\\.(.+)" collection)
+    (apply #'find (collection (db *default-connection* db) collection) query args)))
+
+(defun find-one (collection &optional (query (bson)) projection)
+  (let ((cursor (find collection query :projection projection :limit -1)))
     (if (next-p cursor)
         (next cursor))))
 

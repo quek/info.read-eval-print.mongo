@@ -22,5 +22,7 @@
 
            #:map-reduce
 
+           #:*default-connection*
+
            #:scan-mongo))
 
