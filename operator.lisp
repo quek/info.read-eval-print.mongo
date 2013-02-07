@@ -99,41 +99,47 @@
 (defun $polygon (x1 y1 x2 y2 x3 y3)
   (bson "$polygon" (list (list x1 y1) (list x2 y2) (list x3 y3))))
 
-#|
-           $pop
-           $
-           $pull
-$pull-all
-|#
+(defun $pop (field first-or-last)
+  (cons "$pop" (bson field (if (eq first-or-last :first) -1 1))))
+
+(defun $pull (field value)
+  (cons "$pull" (bson field value)))
+
+(defun $pull-all (field &rest values)
+  (cons "$pullAll" (bson field values)))
 
 (defun $push (key value)
   (cons "$push" (bson key value)))
 
-#|
-           $push-all
-           $query
-           $regex
-           $rename
-           $return-key
-|#
+(defun $push-all (field &rest values)
+  (cons "$pushAll" (bson field values)))
+
+(defun $rename (&rest old-new-list)
+  (cons "$rename" (apply #'bson old-new-list)))
 
 (defun $set (key value)
   (cons "$set" (bson key value)))
 
-#|
-           $show-disk-loc
-           $size
-           $snapshot
-           $type
-           $unique-docs
-           $unset
-           $where
+(defun $size (field size)
+  (cons field (bson "$size" size)))
 
+(defun $type (field type)
+  (cons field (bson "$type" type)))
 
-|#
+(defun $unset (field)
+  (cons "$unset" (bson field "")))
 
-(defun $within (field value)
-  (cons field (bson "$within" value)))
+(defgeneric $where (js)
+  (:method ((js string))
+    (cons "$where" js))
+  (:method ((js list))
+    (cons "$where" (js js))))
+
+(defun $within (field value &key (unique-docs t))
+  (let ((bson (bson "$within" value)))
+    (unless unique-docs
+      (setf (value bson "$uniqueDocs") +bson-false+))
+   (cons field bson)))
 
 
 #|
@@ -143,4 +149,8 @@ $max
 $max-scan
 $min
 $orderby
+$query
+$return-key
+$show-disk-loc
+$snapshot
 |#
