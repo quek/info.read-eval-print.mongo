@@ -4,6 +4,7 @@
   (:use #:cl #:info.read-eval-print.bson)
   (:shadow #:delete #:find)
   (:export #:connect
+           #:connect-replica-set
            #:db
            #:collection
            #:insert

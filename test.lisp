@@ -1,6 +1,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (ql:quickload :info.read-eval-print.mongo)
-  (ql:quickload :fiveam))
+  (ql:quickload :fiveam)
+  (ql:quickload :info.read-eval-print.double-quote))
 
 (defpackage :info.read-eval-print.mongo.test
   (:use :cl :info.read-eval-print.mongo :info.read-eval-print.bson :fiveam :series)
@@ -10,6 +11,8 @@
   (:import-from :info.read-eval-print.bson #:regex))
 
 (in-package :info.read-eval-print.mongo.test)
+
+(named-readtables:in-readtable info.read-eval-print.double-quote:|#"|)
 
 (defparameter *test-mongod* "/usr/bin/mongod")
 (defparameter *test-db-dir* "/tmp/info.read-eval-print.mongo.test")
@@ -28,11 +31,47 @@
   (asdf:run-shell-command "kill `pgrep -f '~a .* --port ~a'`" *test-mongod* *test-port*))
 
 (defmacro with-test-mongod (&body body)
-  `(unwind-protect
-        (progn
-          (run-test-mongod)
-          ,@body)
-     (kill-test-mongod)))
+  `(progn
+     (run-test-mongod)
+     (unwind-protect
+          (progn ,@body)
+       (kill-test-mongod))))
+
+
+(defun run-test-replica-set ()
+  (let ((asdf::*verbose-out* *terminal-io*))
+    (loop for i from 1 to 3
+          for db-dir = #"""#,*test-db-dir*,.#,i"""
+          do (asdf:run-shell-command #"""rm -rf #,db-dir""")
+             (ensure-directories-exist #"""#,db-dir,/""")
+             (asdf:run-shell-command
+              #"""#,*test-mongod* --dbpath #,db-dir --port #,(+ i *test-port*) ~
+--pidfilepath #,db-dir,/mongod.pid ~
+--fork --logpath #,db-dir,/mongod.log --nojournal --noprealloc --smallfiles ~
+--replSet rs0"""))
+    (let ((hostname (isys:gethostname)))
+      (asdf:run-shell-command #"""mongo --port #,(1+ *test-port*) --eval '~
+rs.initiate(); ~
+while(!rs.isMaster().ismaster) sleep(100); ~
+rs.add("#,hostname,:#,(+ 2 *test-port*)"); ~
+rs.add("#,hostname,:#,(+ 3 *test-port*)");'""")
+      (loop for i from 2 to 3
+            do (asdf:run-shell-command #"""mongo --port #,(+ i *test-port*) --eval '~
+while(!rs.isMaster().secondary) sleep(100);'""")))))
+
+(defun kill-test-replica-set ()
+  (let ((asdf::*verbose-out* *terminal-io*))
+    (loop for i from 1 to 3
+          do (asdf:run-shell-command
+              #"""kill `pgrep -f '#,*test-mongod* .* --port #,(+ i *test-port*)'`"""))))
+
+(defmacro with-test-replica-set (&body body)
+  `(progn
+     (run-test-replica-set)
+     (unwind-protect
+          (progn ,@body)
+       (kill-test-replica-set))))
+
 
 (defparameter *test-db* nil)
 
@@ -206,6 +245,34 @@
     return this.credits === this.debits;
 }"))
              (bson ($where '(lambda () (= (chain this credits) (chain this debits))))))))
+
+
+(test replica-set
+  (with-test-replica-set
+    (let ((connection (apply #'connect-replica-set (loop with hostname = (isys:gethostname)
+                                                         for i from 1 to 3
+                                                         collect #"""#,hostname,:#,(+ i *test-port*)"""))))
+      (unwind-protect
+           (progn
+             (is (slot-value connection 'info.read-eval-print.mongo::primary))
+             (is (= 2 (length (slot-value connection 'info.read-eval-print.mongo::slaves))))
+             (let* ((db (db connection "test"))
+                    (collection (collection db "nya1")))
+               (insert collection (bson :foo "bar"))
+               (is (string= "bar" (value (find-one collection) :foo)))))
+        (close connection)))
+    (let ((connection (apply #'connect-replica-set (loop with hostname = (isys:gethostname)
+                                                         for i from 3 to 4
+                                                         collect #"""#,hostname,:#,(+ i *test-port*)"""))))
+      (unwind-protect
+           (progn
+             (is (slot-value connection 'info.read-eval-print.mongo::primary))
+             (is (= 2 (length (slot-value connection 'info.read-eval-print.mongo::slaves))))
+             (let* ((db (db connection "test"))
+                    (collection (collection db "nya2")))
+               (insert collection (bson :foo "bar"))
+               (is (string= "bar" (value (find-one collection) :foo)))))
+        (close connection)))))
 
 (with-test-db
   (debug!))

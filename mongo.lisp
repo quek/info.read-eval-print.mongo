@@ -23,11 +23,24 @@
   response-to                           ;int32
   op-code)                              ;int32
 
+(defgeneric stream-of (connection &key &allow-other-keys))
+
 (defclass connection ()
-  ((host :initarg :host)
-   (port :initarg :port)
+  ((host       :initarg  :host)
+   (port       :initarg  :port)
    (request-id :initform 0)
    (stream)))
+
+(defclass replica-set (connection)
+  ((hosts   :initarg  :hosts)
+   (primary :initform nil)
+   (slaves  :initform nil)))
+
+(defmethod stream-of ((self connection) &key)
+  (slot-value self 'stream))
+
+(defmethod stream-of ((self replica-set) &key)
+  (stream-of (slot-value self 'primary)))
 
 (defclass db ()
   ((name :initarg :name :reader name)
@@ -55,6 +68,7 @@
    (documents-count   :initform 0)
    (query-run-p       :initform nil)))
 
+
 (defmethod connection ((cursor cursor))
   (with-slots (collection) cursor
     (connection collection)))
@@ -63,12 +77,45 @@
 (defun connect (&key (host "localhost") (port 27017))
   (make-instance 'connection :host host :port port))
 
-(defmethod initialize-instance :after ((connection connection) &key)
-  (with-slots (host port stream) connection
+(defun connect-replica-set (&rest hosts)
+  "hosts is \"aaa.example.com:1234\" \"bbb.example.com:1235\""
+  (make-instance 'replica-set :hosts hosts))
+
+(defmethod initialize-instance :after ((self connection) &key)
+  (establish-connection self))
+
+(defmethod establish-connection ((self connection))
+  (with-slots (host port stream) self
     (setf stream (iolib.sockets:make-socket :remote-host host :remote-port port))))
 
+(defmethod establish-connection ((self replica-set))
+  (with-slots (primary slaves) self
+    (prog* ((hosts (slot-value self 'hosts))
+            (all-hosts hosts))
+     go
+       (loop with new-hosts = ()
+             for node in hosts
+             for host-name = (subseq node 0 (position #\: node))
+             for port = (parse-integer node :start (1+ (position #\: node)))
+             for connection = (ignore-errors (connect :host host-name :port port))
+             if connection
+               do (let ((res (command (db connection "test") "ismaster")))
+                    (if (value res "ismaster")
+                        (setf primary connection)
+                        (push connection slaves))
+                    (loop for host in (value res "hosts")
+                          unless (member host all-hosts :test #'string=)
+                            do (pushnew host new-hosts :test #'string=)
+                               (pushnew host all-hosts :test #'string=)))
+             finally (when new-hosts
+                       (setf hosts new-hosts)
+                       (go go))))
+    (unless primary
+      (error "primary is not found."))))
+
+
 (defmethod send ((connection connection) op size function)
-  (with-slots (stream) connection
+  (let ((stream (stream-of connection)))
     (let ((request-id (next-request-id connection)))
       (write-sequence (fast-io:with-fast-output (out)
                         (fast-io:write32-le (+ +msg-header-size+ size) out)
@@ -86,6 +133,12 @@
 (defmethod close ((connection connection) &key abort)
   (with-slots (stream) connection
     (close stream :abort abort)))
+
+(defmethod close ((self replica-set) &key abort)
+  (with-slots (primary slaves) self
+    (dolist (slave slaves)
+      (close slave :abort abort))
+    (close primary :abort abort)))
 
 (defmacro with-connection ((var &key (host "localhost") (port 27017)) &body body)
   `(let ((,var (connect :host ,host :port ,port)))
@@ -242,7 +295,7 @@
 
 (defmethod receive ((cursor cursor) expected-request-id)
   (with-slots (documents documents-count cursor-id) cursor
-    (fast-io:with-fast-input (in nil (slot-value (connection cursor) 'stream))
+    (fast-io:with-fast-input (in nil (stream-of (connection cursor)))
       (let ((message-length (fast-io:read32-le in))
             (request-id (fast-io:read32-le in))
             (response-to (fast-io:read32-le in))
@@ -357,7 +410,10 @@
 (defmethod stats ((db db))
   (command db (bson :dbstats 1)))
 
-(defmethod command ((db db) selector &key)
+(defmethod command ((db db) command &key)
+  (command db (bson command 1)))
+
+(defmethod command ((db db) (selector bson) &key)
   (find-one (collection db "$cmd") selector))
 
 (defmethod command ((collection collection) selector &rest args &key)
