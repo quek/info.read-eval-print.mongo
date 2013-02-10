@@ -271,6 +271,10 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
              (let* ((db (db connection "test"))
                     (collection (collection db "nya2")))
                (insert collection (bson :foo "bar"))
+               (is (string= "bar" (value (find-one collection) :foo)))
+               (let ((asdf::*verbose-out* *terminal-io*))
+                 (asdf:run-shell-command
+                  #"""kill `pgrep -f '#,*test-mongod* .* --port #,(+ 1 *test-port*)'`"""))
                (is (string= "bar" (value (find-one collection) :foo)))))
         (close connection)))))
 

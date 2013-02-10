@@ -127,6 +127,49 @@
       (force-output stream)
       request-id)))
 
+(defmethod send-and-receive ((connection connection) (cursor cursor) op size function)
+  (let ((expected-request-id (send connection op size function)))
+    (with-slots (documents documents-count cursor-id) cursor
+      (fast-io:with-fast-input (in nil (stream-of connection))
+        (let ((message-length (fast-io:read32-le in))
+              (request-id (fast-io:read32-le in))
+              (response-to (fast-io:read32-le in))
+              (op-code (fast-io:read32-le in)))
+          (declare (ignore message-length request-id))
+          (unless (= op-code +op-reply+)
+            (error "Unexpected OP_CODE ~a" op-code))
+          (unless (= response-to expected-request-id)
+            (error "Unexpected ResponseTo ~a" response-to))
+          (let (number-returned)
+            (fast-io:read32-le in)        ;response flags
+            (setf cursor-id (fast-io:read64-le in))
+            (fast-io:read32-le in)        ;starting-from
+            (setf number-returned (fast-io:read32-le in)) ;number returned
+            (setf documents (loop repeat number-returned
+                                  collect (decode in)))
+            (incf documents-count number-returned)))))))
+
+(defmacro with-reconnect-around (connection &key (max-retry-count 10) (retry-sleep 3))
+  (let ((retry-count (gensym "retry-count")))
+    `(loop for ,retry-count from 0
+           do (handler-case (progn
+                              (unless (zerop ,retry-count)
+                                (establish-connection ,connection))
+                              (return (call-next-method)))
+                (error (e)
+                  (when (< ,max-retry-count ,retry-count)
+                    (signal e))
+                  (warn "reconnecting... ~a" e)
+                  (sleep ,retry-sleep)
+                  (close ,connection))))))
+
+(defmethod send :around ((self replica-set) op size function)
+  (with-reconnect-around self))
+
+(defmethod send-and-receive :around ((self replica-set) (cursor cursor) op size function)
+  (with-reconnect-around self))
+
+
 (defmethod next-request-id ((connection connection))
   (incf (slot-value connection 'request-id)))
 
@@ -138,10 +181,17 @@
   (with-slots (primary slaves) self
     (dolist (slave slaves)
       (close slave :abort abort))
-    (close primary :abort abort)))
+    (close primary :abort abort)
+    (setf slaves nil
+          primary nil)))
 
 (defmacro with-connection ((var &key (host "localhost") (port 27017)) &body body)
   `(let ((,var (connect :host ,host :port ,port)))
+     (unwind-protect (progn ,@body)
+       (close ,var))))
+
+(defmacro with-replica-set ((var &rest hosts) &body body)
+  `(let ((,var (connect-replica-set ,@hosts)))
      (unwind-protect (progn ,@body)
        (close ,var))))
 
@@ -262,57 +312,36 @@
           (full-collection-name (full-collection-name collection))
           (query-data (make-query-data cursor))
           (projection-data (make-projection-bson projection)))
-      (let ((request-id
-              (send (connection cursor)
-                    +op-query+
-                    (+ 4 (length full-collection-name) 4 4
-                       (length query-data)
-                       (length projection-data))
-                    (lambda (out)
-                      (fast-io:write32-le flag out)
-                      (fast-io:fast-write-sequence full-collection-name out)
-                      (fast-io:write32-le skip out)
-                      (fast-io:write32-le limit out)
-                      (fast-io:fast-write-sequence query-data out)
-                      (when projection-data
-                        (fast-io:fast-write-sequence projection-data out))))))
-        (receive cursor request-id)))
+      (send-and-receive (connection cursor)
+                        cursor
+                        +op-query+
+                        (+ 4 (length full-collection-name) 4 4
+                           (length query-data)
+                           (length projection-data))
+                        (lambda (out)
+                          (fast-io:write32-le flag out)
+                          (fast-io:fast-write-sequence full-collection-name out)
+                          (fast-io:write32-le skip out)
+                          (fast-io:write32-le limit out)
+                          (fast-io:fast-write-sequence query-data out)
+                          (when projection-data
+                            (fast-io:fast-write-sequence projection-data out)))))
     (setf query-run-p t)))
 
 (defmethod send-get-more ((cursor cursor))
   (with-slots (documents-count cursor-id limit collection) cursor
     (let ((full-collection-name (full-collection-name collection))
           (number-to-return (if (zerop limit) 0 (- limit documents-count))))
-      (let ((request-id (send (connection cursor)
-                              +op-get-more+
-                              (+ 4 (length full-collection-name) 4 8)
-                              (lambda (out)
-                                (fast-io:write32-le 0 out)
-                                (fast-io:fast-write-sequence full-collection-name out)
-                                (fast-io:write32-le number-to-return out)
-                                (fast-io:write64-le cursor-id out)))))
-        (receive cursor request-id)))))
+      (send-and-receive (connection cursor)
+                        cursor
+                        +op-get-more+
+                        (+ 4 (length full-collection-name) 4 8)
+                        (lambda (out)
+                          (fast-io:write32-le 0 out)
+                          (fast-io:fast-write-sequence full-collection-name out)
+                          (fast-io:write32-le number-to-return out)
+                          (fast-io:write64-le cursor-id out))))))
 
-(defmethod receive ((cursor cursor) expected-request-id)
-  (with-slots (documents documents-count cursor-id) cursor
-    (fast-io:with-fast-input (in nil (stream-of (connection cursor)))
-      (let ((message-length (fast-io:read32-le in))
-            (request-id (fast-io:read32-le in))
-            (response-to (fast-io:read32-le in))
-            (op-code (fast-io:read32-le in)))
-        (declare (ignore message-length request-id))
-        (unless (= op-code +op-reply+)
-          (error "Unexpected OP_CODE ~a" op-code))
-        (unless (= response-to expected-request-id)
-          (error "Unexpected ResponseTo ~a" response-to))
-        (let (number-returned)
-          (fast-io:read32-le in)        ;response flags
-          (setf cursor-id (fast-io:read64-le in))
-          (fast-io:read32-le in)        ;starting-from
-          (setf number-returned (fast-io:read32-le in)) ;number returned
-          (setf documents (loop repeat number-returned
-                                collect (decode in)))
-          (incf documents-count number-returned))))))
 
 (defmethod make-query-data ((cursor cursor))
   (with-slots (query sort) cursor

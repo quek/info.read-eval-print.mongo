@@ -5,11 +5,12 @@
   (:shadow #:delete #:find)
   (:export #:connect
            #:connect-replica-set
+           #:with-connection
+           #:with-replica-set
            #:db
            #:collection
            #:insert
            #:update
-           #:with-connection
            #:find
            #:find-one
            #:find-all

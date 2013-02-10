@@ -58,3 +58,12 @@
 ;;     SLAVES      = (#<CONNECTION {10037860B3}> #<CONNECTION {100377F363}>)
 ;;   
 ;;⇒ 
+
+
+(with-replica-set (c "yarn:27078" "yarn:27079" "yarn:27080")
+  (let* ((db (db c "test"))
+         (cl (collection db "nya1")))
+    (find-all cl)))
+;;⇒ ({"_id": ObjectId("5117952A96B30D90C32EE11E"), "foo": "bar"})
+
+
