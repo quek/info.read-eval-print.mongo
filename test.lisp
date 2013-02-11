@@ -249,9 +249,9 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 
 (test replica-set
   (with-test-replica-set
-    (let ((connection (apply #'connect-replica-set (loop with hostname = (isys:gethostname)
-                                                         for i from 1 to 3
-                                                         collect #"""#,hostname,:#,(+ i *test-port*)"""))))
+    (let ((connection (apply #'connect-replica-set
+                             (loop for i from 1 to 3
+                                   collect #"""#,(isys:gethostname),:#,(+ i *test-port*)"""))))
       (unwind-protect
            (progn
              (is (slot-value connection 'info.read-eval-print.mongo::primary))
@@ -261,9 +261,9 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
                (insert collection (bson :foo "bar"))
                (is (string= "bar" (value (find-one collection) :foo)))))
         (close connection)))
-    (let ((connection (apply #'connect-replica-set (loop with hostname = (isys:gethostname)
-                                                         for i from 3 to 4
-                                                         collect #"""#,hostname,:#,(+ i *test-port*)"""))))
+    (let ((connection (apply #'connect-replica-set
+                             (loop for i from 3 to 4
+                                   collect #"""#,(isys:gethostname),:#,(+ i *test-port*)"""))))
       (unwind-protect
            (progn
              (is (slot-value connection 'info.read-eval-print.mongo::primary))

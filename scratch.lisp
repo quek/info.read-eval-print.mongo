@@ -67,3 +67,19 @@
 ;;⇒ ({"_id": ObjectId("5117952A96B30D90C32EE11E"), "foo": "bar"})
 
 
+
+(with-connection (c)
+  (let* ((db (db c "outing"))
+         (col (collection db "logs.app")))
+    (series:collect (scan-mongo col (bson ($gte :time (datetime 2012 12 26 13 55 51)))
+                                :limit 1))))
+;;⇒ ({"_id": ObjectId("50DA83E3732C156605000009"), "messages": ["Started GET \"/facilities\" for 127.0.0.1 at 2012-12-26 13:55:51 +0900", "Processing by FacilitiesController#index as HTML", "2012/12/26 13:55:51 \"\" \"fe03df132cde54e2120d3ad4433329e34fc855b6\" \"Mozilla/5.0 (X11; Linux x86_64; rv:10.0.11) Gecko/20100101 Firefox/10.0.11 Iceweasel/10.0.11\" GET /facilities", "Completed 200 OK in 372ms (Views: 328.7ms | ActiveRecord: 23.4ms | Solr: 6.7ms)"], "level": "INFO", "time": @2012-12-26T13:55:51.000000+09:00})
+
+
+
+(with-connection (c)
+  (let* ((db (db c "test"))
+         (col (collection db "foo")))
+    (insert col (bson :a (datetime 2013 1 2 3 4 5 6 7 8)))))
+;;⇒ 
+
