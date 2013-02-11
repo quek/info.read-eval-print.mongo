@@ -448,6 +448,16 @@
 (defmethod command ((collection collection) selector &rest args &key)
   (apply #'command (db collection) selector args))
 
+(defmethod count ((collection collection) query &key skip limit)
+  (value (command collection (apply #'bson :count (name collection)
+                                    (append (if query
+                                                `(:query ,query))
+                                            (if skip
+                                                `(:skip ,skip))
+                                            (if limit
+                                                `(:limit ,limit)))))
+         :n))
+
 
 (defmethod map-reduce ((collection collection) (map javascript-code) (reduce javascript-code)
                        &key out query sort limit finalize scope js-mode verbose)

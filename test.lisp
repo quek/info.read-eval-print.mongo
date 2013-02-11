@@ -5,7 +5,7 @@
 
 (defpackage :info.read-eval-print.mongo.test
   (:use :cl :info.read-eval-print.mongo :info.read-eval-print.bson :fiveam :series)
-  (:shadowing-import-from :info.read-eval-print.mongo #:delete #:find)
+  (:shadowing-import-from :info.read-eval-print.mongo #:count #:delete #:find)
   (:import-from :fiveam #:def-suite*)
   (:import-from :parenscript #:@ #:chain)
   (:import-from :info.read-eval-print.bson #:regex))
@@ -138,6 +138,14 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
       (is (value stats :collections))
       (is (value stats :objects)))))
 
+(test test-count
+  (with-test-collection (col)
+    (collect-ignore (insert col (bson :foo (scan-range :length 12))))
+    (is (= 12 (count col nil)))
+    (is (= 3 (count col (bson ($lt :foo 3)))))
+    (is (= 10 (count col (bson ($gt :foo 0)) :skip 1)))
+    (is (= 2 (count col nil :limit 2)))))
+
 (test map-reduce
   (with-test-collection (c)
     (loop for cust-id from 1 to 10
@@ -246,7 +254,7 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 }"))
              (bson ($where '(lambda () (= (chain this credits) (chain this debits))))))))
 
-
+#+nil
 (test replica-set
   (with-test-replica-set
     (let ((connection (apply #'connect-replica-set
