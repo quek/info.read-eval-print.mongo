@@ -68,6 +68,11 @@
    (documents-count   :initform 0)
    (query-run-p       :initform nil)))
 
+(defmethod initialize-instance :after ((cursor cursor) &key)
+  (with-slots (query) cursor
+    (unless query
+      (setf query (bson)))))
+
 
 (defmethod connection ((cursor cursor))
   (with-slots (collection) cursor
@@ -381,7 +386,7 @@
                                     projection)))))
 
 
-(defmethod find ((collection collection) &optional (query (bson))
+(defmethod find ((collection collection) query
                  &key (skip 0) (limit 0) sort projection
                    tailable-cursor
                    slave-ok
@@ -404,14 +409,14 @@
                  :exhaust exhaust
                  :partial partial))
 
-(defmethod find ((collection string) &optional (query (bson))
+(defmethod find ((collection string) query
                  &rest args &key &allow-other-keys)
   (unless *default-connection*
     (setf *default-connection* (connect)))
   (ppcre:register-groups-bind (db collection) ("([^.]+)\\.(.+)" collection)
     (apply #'find (collection (db *default-connection* db) collection) query args)))
 
-(defun find-one (collection &optional (query (bson)) projection)
+(defun find-one (collection query &optional projection)
   (let ((cursor (find collection query :projection projection :limit -1)))
     (if (next-p cursor)
         (next cursor))))
