@@ -40,8 +40,13 @@
 (defun $gt (field value)
   (cons field (bson "$gt" value)))
 
+(setf (fdefinition '$>) (fdefinition '$gt))
+
 (defun $gte (field value)
   (cons field (bson "$gte" value)))
+
+(setf (fdefinition '$>=) (fdefinition '$gte))
+
 
 (defun $in (field &rest values)
   (cons field (bson "$in" values)))
@@ -55,8 +60,12 @@
 (defun $lt (field value)
   (cons field (bson "$lt" value)))
 
+(setf (fdefinition '$<) (fdefinition '$lt))
+
 (defun $lte (field value)
   (cons field (bson "$lte" value)))
+
+(setf (fdefinition '$<=) (fdefinition '$lte))
 
 
 ;; $max-distance

@@ -16,6 +16,7 @@
            #:find-all
            #:next
            #:next-p
+           #:count
 
            #:command
            #:stats
@@ -32,14 +33,14 @@
            #:$elem-match
            #:$exists
            #:$explain
-           #:$gt
-           #:$gte
+           #:$gt  #:$>
+           #:$gte #:$>=
            #:$hint
            #:$in
            #:$inc
            #:$isolated
-           #:$lt
-           #:$lte
+           #:$lt  #:$<
+           #:$lte #:$<=
            #:$max
            #:$max-distance
            #:$max-scan
