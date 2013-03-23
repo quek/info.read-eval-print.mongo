@@ -11,6 +11,7 @@
            #:collection
            #:insert
            #:update
+           #:delete
            #:find
            #:find-one
            #:find-all
