@@ -260,8 +260,7 @@
             (fast-io:fast-write-sequence update out)))
     (values)))
 
-(defmethod delete ((collection collection) &optional selector &key single-remove)
-  (declare #+sbcl(sb-ext:muffle-conditions sb-kernel:redefinition-warning))
+(defmethod delete ((collection collection) selector &key single-remove)
   (let ((flag (logior (if single-remove #b1 0)))
         (full-collection-name (full-collection-name collection))
         (selector (encode (if selector selector (bson)))))
@@ -447,8 +446,13 @@
 (defmethod command ((db db) command &key)
   (command db (bson command 1)))
 
-(defmethod command ((db db) (selector bson) &key)
-  (find-one (collection db "$cmd") selector))
+(defmethod command ((db db) (selector bson) &key error-p)
+  (let ((doc (find-one (collection db "$cmd") selector)))
+    (if error-p
+        (if (= 1.0 (value doc "ok"))
+            (print doc)
+            (error 'operation-failure :doc doc))
+        doc)))
 
 (defmethod command ((collection collection) selector &rest args &key)
   (apply #'command (db collection) selector args))
@@ -485,7 +489,7 @@
       (setf (value bson "js-mode") js-mode))
     (when verbose
       (setf (value bson "verbose") verbose))
-    (command collection bson)))
+    (command (db collection) bson)))
 
 (defun js (js)
   (make-instance 'javascript-code
@@ -498,3 +502,23 @@
 (defmethod map-reduce (collection map (reduce list)
                        &rest args &key &allow-other-keys)
   (apply #'map-reduce collection map (js reduce) args))
+
+
+(defgeneric find-and-modify (collection query &key update remove new upsert))
+
+(defmethod find-and-modify ((collection collection) query &key update remove new upsert sort fields)
+  (let ((bson (bson "findandmodify" (name collection)
+                    "query" query)))
+    (when update
+      (setf (value bson "update") update))
+    (when remove
+      (setf (value bson "remove") t))
+    (when new
+      (setf (value bson "new") t))
+    (when upsert
+      (setf (value bson "upsert") t))
+    (when sort
+      (setf (value bson "sort") (sort-bson sort)))
+    (when fields
+      (setf (value bson "fields") fields))
+    (value (command (db collection) bson :error-p t) "value")))

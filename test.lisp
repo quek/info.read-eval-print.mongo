@@ -84,7 +84,7 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 
 (defmacro with-test-collection ((collection &optional (collection-name "cons")) &body body)
   `(let ((,collection (collection *test-db* ,collection-name)))
-     (delete ,collection)
+     (delete ,collection nil)
      ,@body))
 
 (def-suite all)
@@ -145,6 +145,16 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
     (is (= 3 (count col (bson ($lt :foo 3)))))
     (is (= 10 (count col (bson ($gt :foo 0)) :skip 1)))
     (is (= 2 (count col nil :limit 2)))))
+
+(test find-and-modify
+  (with-test-collection (c)
+    (insert c (bson :a 1 :b 2))
+    (insert c (bson :a 11 :b 22))
+    (let ((x (print (find-and-modify c (bson :a 11) :update (bson ($set :b 222))))))
+      (is (= 22 (value x :b)))
+      (is (= 222 (value (find-one c (bson :a 11)) :b))))
+    (let ((x (find-and-modify c (bson :a 11) :update (bson ($set :b 2222)) :new t)))
+      (is (= 2222 (value x :b))))))
 
 (test map-reduce
   (with-test-collection (c)

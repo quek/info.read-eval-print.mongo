@@ -78,7 +78,11 @@
            #:$within
 
            #:map-reduce
+           #:find-and-modify
 
            #:*default-connection*
 
-           #:scan-mongo))
+           #:scan-mongo
+
+           #:mongo-error
+           #:operation-failure))

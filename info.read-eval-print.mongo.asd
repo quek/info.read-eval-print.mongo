@@ -6,6 +6,7 @@
   :author "TAHARA Yoshinori <read.eval.print@gmail.com"
   :license "BSD Licence"
   :components ((:file "package")
+               (:file "condition")
                (:file "operator")
                (:file "mongo")
                (:file "series"))
