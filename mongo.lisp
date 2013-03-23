@@ -450,7 +450,7 @@
   (let ((doc (find-one (collection db "$cmd") selector)))
     (if error-p
         (if (= 1.0 (value doc "ok"))
-            (print doc)
+            doc
             (error 'operation-failure :doc doc))
         doc)))
 
