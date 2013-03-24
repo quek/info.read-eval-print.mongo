@@ -35,7 +35,9 @@
   (cons array-field (bson "$elemMatch" (apply #'bson matches))))
 
 (defun $exists (field boolean)
-  (cons field (bson "$exists" (if boolean +bson-true+ +bson-false+))))
+  (cons field (bson "$exists"
+                    (if (and boolean (not (eq boolean +bson-false+)))
+                        +bson-true+ +bson-false+))))
 
 (defun $gt (field value)
   (cons field (bson "$gt" value)))
@@ -126,8 +128,8 @@
 (defun $rename (&rest old-new-list)
   (cons "$rename" (apply #'bson old-new-list)))
 
-(defun $set (key value)
-  (cons "$set" (bson key value)))
+(defun $set (&rest key-value-plist)
+  (cons "$set" (apply #'bson key-value-plist)))
 
 (defun $size (field size)
   (cons field (bson "$size" size)))
