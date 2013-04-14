@@ -78,6 +78,7 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 (defmacro with-test-db (&body body)
   (let ((connection (gensym "connection")))
     `(with-test-mongod
+       (sleep 0.1)
        (with-connection (,connection :port *test-port*)
          (setf *test-db* (db ,connection "test"))
          ,@body))))
@@ -277,7 +278,7 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 }"))
              (bson ($where '(lambda () (= (chain this credits) (chain this debits))))))))
 
-#+nil
+#+replica-setのテストをする?
 (test replica-set
   (with-test-replica-set
     (let ((connection (apply #'connect-replica-set
