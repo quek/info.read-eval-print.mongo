@@ -78,7 +78,7 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 (defmacro with-test-db (&body body)
   (let ((connection (gensym "connection")))
     `(with-test-mongod
-       (sleep 0.1)
+       (sleep 0.2)
        (with-connection (,connection :port *test-port*)
          (setf *test-db* (db ,connection "test"))
          ,@body))))
@@ -169,6 +169,15 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
       (let ((x (car x)))
         (is (= 1 (value x :a)))
         (is (= 2 (value x :b)))))))
+
+(test tailable-cursor
+  (let* ((capped-collection (make-collection *test-db* "capped" :capped t :size 3)))
+    (insert capped-collection (bson :a 1))
+    (let ((cursor (find capped-collection nil :tailable t)))
+      (is (next cursor))
+      (is (eq :no-data (next cursor :error-value :no-data)))
+      (insert capped-collection (bson :a 1))
+      (is (= 1 (value (next cursor) :a))))))
 
 (test map-reduce
   (with-test-collection (c)

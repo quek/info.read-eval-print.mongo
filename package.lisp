@@ -1,7 +1,7 @@
 ;;;; package.lisp
 
 (defpackage #:info.read-eval-print.mongo
-  (:use #:cl #:info.read-eval-print.bson)
+  (:use #:cl #:info.read-eval-print.bson #:anaphora)
   (:shadow #:count #:delete #:find)
   (:export #:connect
            #:connect-replica-set
@@ -9,6 +9,7 @@
            #:with-replica-set
            #:db
            #:collection
+           #:make-collection
            #:insert
            #:update
            #:delete

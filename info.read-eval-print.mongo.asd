@@ -10,5 +10,5 @@
                (:file "operator")
                (:file "mongo")
                (:file "series"))
-  :depends-on (:info.read-eval-print.bson :iolib :parenscript :series))
+  :depends-on (:info.read-eval-print.bson :iolib :parenscript :series :anaphora))
 

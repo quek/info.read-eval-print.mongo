@@ -1,6 +1,6 @@
 (in-package #:info.read-eval-print.mongo)
 
-(defgeneric next (cursor))
+(defgeneric next (cursor &key error-p error-value))
 (defgeneric next-p (cursor))
 
 (defvar *default-connection* nil)
@@ -57,7 +57,7 @@
    (limit             :initarg  :limit             :initform 0)
    (sort              :initarg  :sort              :initform nil)
    (projection        :initarg  :projection        :initform nil)
-   (tailable-cursor   :initarg  :tailable-cursor   :initform nil)
+   (tailable          :initarg  :tailable          :initform nil)
    (slave-ok          :initarg  :slave-ok          :initform nil)
    (no-cursor-timeout :initarg  :no-cursor-timeout :initform nil)
    (await-data        :initarg  :await-data        :initform nil)
@@ -213,6 +213,15 @@
 (defmethod collection ((db db) name)
   (make-instance 'collection :name name :db db))
 
+(defmethod make-collection ((db db) name &key capped size)
+  (aprog1 (make-instance 'collection :name name :db db)
+    (let ((command (bson :create name)))
+      (when capped
+        (setf (value command :capped) t))
+      (when size
+        (setf (value command :size) size))
+      (command db command :error-p t))))
+
 (defmethod connection ((collection collection))
   (connection (slot-value collection 'db)))
 
@@ -274,7 +283,7 @@
             (fast-io:fast-write-sequence selector out)))
     (values)))
 
-(defmethod next ((cursor cursor))
+(defmethod next ((cursor cursor) &key error-p error-value)
   (with-slots (documents) cursor
     (if documents
         (pop documents)
@@ -282,7 +291,9 @@
           (refresh cursor)
           (if documents
               (pop documents)
-              (error "No more documents."))))))
+              (if error-p
+                  (error "No more documents.")
+                  error-value))))))
 
 (defmethod next-p ((cursor cursor))
   (with-slots (documents) cursor
@@ -304,10 +315,10 @@
         (send-inital-query cursor))))
 
 (defmethod send-inital-query ((cursor cursor))
-  (with-slots (tailable-cursor slave-ok no-cursor-timeout await-data exhaust partial
+  (with-slots (tailable slave-ok no-cursor-timeout await-data exhaust partial
                collection skip limit projection
                cache query-run-p) cursor
-    (let ((flag (logior (if tailable-cursor #b10 0)
+    (let ((flag (logior (if tailable #b10 0)
                         (if slave-ok #b100 0)
                         (if no-cursor-timeout #b10000 0)
                         (if await-data #b100000 0)
@@ -387,7 +398,7 @@
 
 (defmethod find ((collection collection) query
                  &key (skip 0) (limit 0) sort projection
-                   tailable-cursor
+                   tailable
                    slave-ok
                    no-cursor-timeout
                    await-data
@@ -401,7 +412,7 @@
                  :limit limit
                  :sort sort
                  :projection projection
-                 :tailable-cursor tailable-cursor
+                 :tailable tailable
                  :slave-ok slave-ok
                  :no-cursor-timeout no-cursor-timeout
                  :await-data await-data
