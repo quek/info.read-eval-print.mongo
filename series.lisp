@@ -1,10 +1,11 @@
 (in-package #:info.read-eval-print.mongo)
 
-(series::defS scan-mongo (collection query &key (skip 0) (limit 0) sort projection)
+(series::defS scan-mongo (collection query &key (skip 0) (limit 0) sort projection
+                                     tailable slave-ok)
   "scan mongoDB collection."
   (series::fragl
    ;; args
-   ((collection) (query) (skip) (limit) (sort) (projection))
+   ((collection) (query) (skip) (limit) (sort) (projection) (tailable) (slave-ok))
    ;; rets
    ((bson t))
    ;; aux
@@ -16,7 +17,9 @@
                        :skip skip
                        :limit limit
                        :sort sort
-                       :projection projection)))
+                       :projection projection
+                       :tailable tailable
+                       :slave-ok slave-ok)))
    ;; body
    ((unless (next-p cursor)
       (go series::end))
