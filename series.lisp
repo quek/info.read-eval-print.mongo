@@ -1,11 +1,12 @@
 (in-package #:info.read-eval-print.mongo)
 
 (series::defS scan-mongo (collection query &key (skip 0) (limit 0) sort projection
-                                     tailable slave-ok)
+                                     tailable (tailable-interval 1) slave-ok)
   "scan mongoDB collection."
   (series::fragl
    ;; args
-   ((collection) (query) (skip) (limit) (sort) (projection) (tailable) (slave-ok))
+   ((collection) (query) (skip) (limit) (sort) (projection) (tailable) (tailable-interval number)
+                         (slave-ok))
    ;; rets
    ((bson t))
    ;; aux
@@ -21,7 +22,12 @@
                        :tailable tailable
                        :slave-ok slave-ok)))
    ;; body
-   ((unless (next-p cursor)
+   (start
+    (unless (next-p cursor)
+      (when tailable
+        (print 'tailable)
+        (sleep tailable-interval)
+        (go start))
       (go series::end))
     (setq bson (next cursor)))
    ;; epilog
