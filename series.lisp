@@ -25,7 +25,6 @@
    (start
     (unless (next-p cursor)
       (when tailable
-        (print 'tailable)
         (sleep tailable-interval)
         (go start))
       (go series::end))
