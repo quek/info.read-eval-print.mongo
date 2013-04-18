@@ -18,6 +18,8 @@
            #:find-all
            #:next
            #:next-p
+           #:alive-p
+           #:dead-p
            #:count
 
            #:command

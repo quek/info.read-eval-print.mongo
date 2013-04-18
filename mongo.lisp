@@ -295,6 +295,13 @@
                   (error "No more documents.")
                   error-value))))))
 
+(defmethod dead-p ((cursor cursor))
+  (with-slots (cursor-id) cursor
+    (zerop cursor-id)))
+
+(defmethod alive-p ((cursor cursor))
+  (not (dead-p cursor)))
+
 (defmethod next-p ((cursor cursor))
   (with-slots (documents) cursor
     (unless documents
