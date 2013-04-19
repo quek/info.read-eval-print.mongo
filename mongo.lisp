@@ -283,6 +283,24 @@
             (fast-io:fast-write-sequence selector out)))
     (values)))
 
+(defmethod dead-p ((cursor cursor))
+  (with-slots (cursor-id) cursor
+    (zerop cursor-id)))
+
+(defmethod alive-p ((cursor cursor))
+  (not (dead-p cursor)))
+
+(defmethod next-p ((cursor cursor))
+  (with-slots (documents tailable) cursor
+    (unless documents
+      (refresh cursor))
+    (if documents
+        t
+        (progn
+          (unless tailable
+            (close cursor))
+          nil))))
+
 (defmethod next ((cursor cursor) &key error-p error-value)
   (with-slots (documents) cursor
     (if documents
@@ -294,23 +312,6 @@
               (if error-p
                   (error "No more documents.")
                   error-value))))))
-
-(defmethod dead-p ((cursor cursor))
-  (with-slots (cursor-id) cursor
-    (zerop cursor-id)))
-
-(defmethod alive-p ((cursor cursor))
-  (not (dead-p cursor)))
-
-(defmethod next-p ((cursor cursor))
-  (with-slots (documents) cursor
-    (unless documents
-      (refresh cursor))
-    (if documents
-        t
-        (progn
-          (close cursor)
-          nil))))
 
 (defmethod refresh ((cursor cursor))
   (with-slots (query-run-p cursor-id documents-count limit) cursor
