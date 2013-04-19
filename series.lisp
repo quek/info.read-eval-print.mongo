@@ -29,6 +29,7 @@
     (unless (next-p cursor)
       (when tailable
         (when (dead-p cursor)
+          (close cursor)
           (setq cursor (find collection
                              (funcall query-update-function query bson)
                              :skip skip
