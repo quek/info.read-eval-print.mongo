@@ -449,7 +449,7 @@
     (unless (zerop cursor-id)
       (send (connection cursor)
             +op-kill-cursors+
-            (+ 4 4 4)
+            (+ 4 4 8)
             (lambda (out)
               (fast-io:write32-le 0 out)
               (fast-io:write32-le 1 out)
