@@ -16,7 +16,7 @@
   (series::fragl
    ;; args
    ((collection) (query) (skip) (limit) (sort) (projection) (tailable)
-                 (query-update-function funcall)
+                 (query-update-function)
                  (slave-ok))
    ;; rets
    ((result t))
