@@ -39,7 +39,7 @@
       (when tailable
         (when (dead-p cursor)
           (close cursor)
-          (setf %query (funcall query-update-function %query result))
+          (setq %query (funcall query-update-function %query result))
           #1#)
         (go start))
       (go series::end))
