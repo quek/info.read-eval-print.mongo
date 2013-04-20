@@ -1,7 +1,7 @@
 MongoDb driver.
 
 ```
-(with-connection (connection :host "localhost" :port 27017)
+(with-connection (connection "localhost:27017")
   (let* ((db (db connection "test"))
          (collection (collection db "foo")))
     (insert collection (bson :name "hoge" :bar "baha"))
