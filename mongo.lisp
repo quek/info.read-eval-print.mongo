@@ -26,13 +26,12 @@
 (defgeneric stream-of (connection &key &allow-other-keys))
 
 (defclass connection ()
-  ((host       :initarg  :host)
-   (port       :initarg  :port)
+  ((node       :initarg  :node)
    (request-id :initform 0)
    (stream)))
 
 (defclass replica-set (connection)
-  ((hosts   :initarg  :hosts)
+  ((nodes   :initarg  :nodes)
    (primary :initform nil)
    (slaves  :initform nil)))
 
@@ -79,41 +78,48 @@
     (connection collection)))
 
 
-(defun connect (&key (host "localhost") (port 27017))
-  (make-instance 'connection :host host :port port))
-
-(defun connect-replica-set (&rest hosts)
-  "hosts is \"aaa.example.com:1234\" \"bbb.example.com:1235\""
-  (make-instance 'replica-set :hosts hosts))
+(defun connect (&optional (node-or-node-list "localhost:27017"))
+  (etypecase node-or-node-list
+    (string
+     (make-instance 'connection :node node-or-node-list))
+    (list
+     (make-instance 'replica-set :nodes node-or-node-list))))
 
 (defmethod initialize-instance :after ((self connection) &key)
   (establish-connection self))
 
+(defun split-host-port (node)
+  (if node
+      (aif (position #\: node)
+           (values (subseq node 0 it)
+                   (parse-integer node :start (1+ it)))
+           (values node 27017))
+      (values "localhost" 27017)))
+
 (defmethod establish-connection ((self connection))
-  (with-slots (host port stream) self
-    (setf stream (iolib.sockets:make-socket :remote-host host :remote-port port))))
+  (with-slots (node stream) self
+    (multiple-value-bind (host port) (split-host-port node)
+      (setf stream (iolib.sockets:make-socket :remote-host host :remote-port port)))))
 
 (defmethod establish-connection ((self replica-set))
   (with-slots (primary slaves) self
-    (prog* ((hosts (slot-value self 'hosts))
-            (all-hosts hosts))
+    (prog* ((nodes (slot-value self 'nodes))
+            (all-nodes nodes))
      go
-       (loop with new-hosts = ()
-             for node in hosts
-             for host-name = (subseq node 0 (position #\: node))
-             for port = (parse-integer node :start (1+ (position #\: node)))
-             for connection = (ignore-errors (connect :host host-name :port port))
+       (loop with new-nodes = ()
+             for node in nodes
+             for connection = (ignore-errors (connect node))
              if connection
                do (let ((res (command (db connection "test") "ismaster")))
                     (if (value res "ismaster")
                         (setf primary connection)
                         (push connection slaves))
-                    (loop for host in (value res "hosts")
-                          unless (member host all-hosts :test #'string=)
-                            do (pushnew host new-hosts :test #'string=)
-                               (pushnew host all-hosts :test #'string=)))
-             finally (when new-hosts
-                       (setf hosts new-hosts)
+                    (loop for node in (value res "hosts")
+                          unless (member node all-nodes :test #'string=)
+                            do (pushnew node new-nodes :test #'string=)
+                               (pushnew node all-nodes :test #'string=)))
+             finally (when new-nodes
+                       (setf nodes new-nodes)
                        (go go))))
     (unless primary
       (error "primary is not found."))))
@@ -185,18 +191,14 @@
 (defmethod close ((self replica-set) &key abort)
   (with-slots (primary slaves) self
     (dolist (slave slaves)
-      (close slave :abort abort))
-    (close primary :abort abort)
+      (and slave (close slave :abort abort)))
+    (and primary (close primary :abort abort))
     (setf slaves nil
           primary nil)))
 
-(defmacro with-connection ((var &key (host "localhost") (port 27017)) &body body)
-  `(let ((,var (connect :host ,host :port ,port)))
-     (unwind-protect (progn ,@body)
-       (close ,var))))
-
-(defmacro with-replica-set ((var &rest hosts) &body body)
-  `(let ((,var (connect-replica-set ,@hosts)))
+(defmacro with-connection ((var &optional (node-or-node-list "localhost:27017")) &body body)
+  "If node-or-node-list is list, connect to replica set."
+  `(let ((,var (connect ,node-or-node-list)))
      (unwind-protect (progn ,@body)
        (close ,var))))
 

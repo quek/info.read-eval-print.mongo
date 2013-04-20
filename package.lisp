@@ -4,9 +4,7 @@
   (:use #:cl #:info.read-eval-print.bson #:anaphora)
   (:shadow #:count #:delete #:find)
   (:export #:connect
-           #:connect-replica-set
            #:with-connection
-           #:with-replica-set
            #:db
            #:collection
            #:make-collection

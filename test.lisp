@@ -79,7 +79,7 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
   (let ((connection (gensym "connection")))
     `(with-test-mongod
        (sleep 0.2)
-       (with-connection (,connection :port *test-port*)
+       (with-connection (,connection #"""localhost:#,*test-port*""")
          (setf *test-db* (db ,connection "test"))
          ,@body))))
 
@@ -287,12 +287,12 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 }"))
              (bson ($where '(lambda () (= (chain this credits) (chain this debits))))))))
 
-#+replica-setのテストをする?
+;#+replica-setのテストをする?
 (test replica-set
   (with-test-replica-set
-    (let ((connection (apply #'connect-replica-set
-                             (loop for i from 1 to 3
-                                   collect #"""#,(isys:gethostname),:#,(+ i *test-port*)"""))))
+    (let ((connection (connect
+                       (loop for i from 1 to 3
+                             collect #"""#,(isys:gethostname),:#,(+ i *test-port*)"""))))
       (unwind-protect
            (progn
              (is (slot-value connection 'info.read-eval-print.mongo::primary))
@@ -300,11 +300,11 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
              (let* ((db (db connection "test"))
                     (collection (collection db "nya1")))
                (insert collection (bson :foo "bar"))
-               (is (string= "bar" (value (find-one collection) :foo)))))
+               (is (string= "bar" (value (find-one collection nil) :foo)))))
         (close connection)))
-    (let ((connection (apply #'connect-replica-set
-                             (loop for i from 3 to 4
-                                   collect #"""#,(isys:gethostname),:#,(+ i *test-port*)"""))))
+    (let ((connection (connect
+                       (loop for i from 3 to 4
+                             collect #"""#,(isys:gethostname),:#,(+ i *test-port*)"""))))
       (unwind-protect
            (progn
              (is (slot-value connection 'info.read-eval-print.mongo::primary))
@@ -312,12 +312,13 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
              (let* ((db (db connection "test"))
                     (collection (collection db "nya2")))
                (insert collection (bson :foo "bar"))
-               (is (string= "bar" (value (find-one collection) :foo)))
+               (is (string= "bar" (value (find-one collection nil) :foo)))
                (let ((asdf::*verbose-out* *terminal-io*))
                  (asdf:run-shell-command
                   #"""kill `pgrep -f '#,*test-mongod* .* --port #,(+ 1 *test-port*)'`"""))
-               (is (string= "bar" (value (find-one collection) :foo)))))
+               (is (string= "bar" (value (find-one collection nil) :foo)))))
         (close connection)))))
 
 (with-test-db
   (debug!))
+
