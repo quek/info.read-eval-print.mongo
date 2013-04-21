@@ -287,7 +287,7 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 }"))
              (bson ($where '(lambda () (= (chain this credits) (chain this debits))))))))
 
-;#+replica-setのテストをする?
+#+replica-setのテストをする?
 (test replica-set
   (with-test-replica-set
     (let ((connection (connect

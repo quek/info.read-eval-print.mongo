@@ -83,3 +83,7 @@
     (insert col (bson :a (datetime 2013 1 2 3 4 5 6 7 8)))))
 ;;⇒ 
 
+
+
+(with-connection (c '("yarn:27077" "yarn:27078" "yarn:27079"))
+  (describe c))
