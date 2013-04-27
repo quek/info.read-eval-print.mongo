@@ -288,6 +288,25 @@ while(!rs.isMaster().secondary) sleep(100);'""")))))
 }"))
              (bson ($where '(lambda () (= (chain this credits) (chain this debits))))))))
 
+(test def-api
+  (with-test-collection (c)
+    (unwind-protect
+         (progn
+           (defpackage :def-api-test (:use :cl))
+           (series::install :pkg :def-api-test)
+           (eval (read-from-string "(def-api \"test\" \"foo\" :package :def-api-test)"))
+           (eval (read-from-string "(def-api-test::foo.insert (bson :a 1))"))
+           (is (= 1 (eval (read-from-string "(def-api-test::foo.count nil)"))))
+           (is (= 1
+                  (value (eval (read-from-string "(def-api-test::foo.find-one (bson :a 1))")) :a)))
+           (is (equal '(1)
+                      (mapcar (lambda (x) (value x :a))
+                              (eval (read-from-string "(def-api-test::foo.find-all (bson :a 1))")))))
+           (is (= 1 (eval (read-from-string "(series:collect-length (def-api-test::foo.scan nil))")))))
+      (delete-package :def-api-test))))
+
+
+
 #+replica-setのテストをする?
 (test replica-set
   (with-test-replica-set
