@@ -28,7 +28,8 @@
 (defclass connection ()
   ((node       :initarg  :node)
    (request-id :initform 0)
-   (stream)))
+   (stream)
+   (open-p     :initform nil   :reader open-p)))
 
 (defclass replica-set (connection)
   ((nodes   :initarg  :nodes)
@@ -43,7 +44,17 @@
 
 (defclass db ()
   ((name :initarg :name :reader name)
-   (connection :initarg :connection :reader connection)))
+   (connection :initarg :connection)))
+
+(defmethod connection ((db db))
+  (cond ((and (slot-boundp db 'connection)
+              (slot-value db 'connection)))
+        (*default-connection*
+         (unless (open-p *default-connection*)
+           (establish-connection *default-connection*))
+         *default-connection*)
+        (t
+         (connect))))
 
 (defclass collection ()
   ((name :initarg :name :reader name)
@@ -78,12 +89,18 @@
     (connection collection)))
 
 
-(defun connect (&optional (node-or-node-list "localhost:27017"))
-  (etypecase node-or-node-list
-    (string
-     (make-instance 'connection :node node-or-node-list))
-    (list
-     (make-instance 'replica-set :nodes node-or-node-list))))
+(defun connect (&optional (node-or-node-list "localhost:27017")
+                  (make-default t))
+  (aprog1
+      (etypecase node-or-node-list
+        (string
+         (make-instance 'connection :node node-or-node-list))
+        (list
+         (make-instance 'replica-set :nodes node-or-node-list)))
+    (when make-default
+      (when *default-connection*
+        (close *default-connection*))
+      (setf *default-connection* it))))
 
 (defmethod initialize-instance :after ((self connection) &key)
   (establish-connection self))
@@ -95,6 +112,10 @@
                    (parse-integer node :start (1+ it)))
            (values node 27017))
       (values "localhost" 27017)))
+
+(defmethod establish-connection :after ((connection connection))
+  (with-slots (open-p) connection
+    (setf open-p t)))
 
 (defmethod establish-connection ((self connection))
   (with-slots (node stream) self
@@ -184,6 +205,11 @@
 (defmethod next-request-id ((connection connection))
   (incf (slot-value connection 'request-id)))
 
+(defmethod close :after ((connection connection) &key abort)
+  (declare (ignore abort))
+  (with-slots (open-p) connection
+    (setf open-p nil)))
+
 (defmethod close ((connection connection) &key abort)
   (with-slots (stream) connection
     (close stream :abort abort)))
@@ -196,9 +222,10 @@
     (setf slaves nil
           primary nil)))
 
-(defmacro with-connection ((var &optional (node-or-node-list "localhost:27017")) &body body)
+(defmacro with-connection ((var &optional (node-or-node-list "localhost:27017")
+                                  (make-default t)) &body body)
   "If node-or-node-list is list, connect to replica set."
-  `(let ((,var (connect ,node-or-node-list)))
+  `(let ((,var (connect ,node-or-node-list, make-default)))
      (unwind-protect (progn ,@body)
        (close ,var))))
 
@@ -240,7 +267,7 @@
     (fast-io:fast-write-byte #.(char-code #\.) out)
     (write-utf-8 (slot-value collection 'name) out :null-terminate-p t)))
 
-(defmethod insert ((collection collection) (document bson))
+(api-defun insert (collection document)
   (let ((flag 0)
         (full-collection-name (full-collection-name collection))
         (data (encode document)))
@@ -253,8 +280,8 @@
             (fast-io:fast-write-sequence data out)))
     (values)))
 
-(defmethod update ((collection collection) (selector bson) (update bson)
-                   &key upsert multi-update)
+(api-defun update (collection selector update
+                              &key upsert multi-update)
   (let ((flags (logior (if upsert #b1 0)
                        (if multi-update #b10 0)))
         (full-collection-name (full-collection-name collection))
@@ -271,7 +298,7 @@
             (fast-io:fast-write-sequence update out)))
     (values)))
 
-(defmethod delete ((collection collection) selector &key single-remove)
+(api-defun delete (collection selector &key single-remove)
   (let ((flag (logior (if single-remove #b1 0)))
         (full-collection-name (full-collection-name collection))
         (selector (encode (if selector selector (bson)))))
@@ -406,14 +433,15 @@
                                     projection)))))
 
 
-(defmethod find ((collection collection) query
+(api-defun find (collection
+                 query
                  &key (skip 0) (limit 0) sort projection
-                   tailable
-                   slave-ok
-                   no-cursor-timeout
-                   await-data
-                   exhaust
-                   partial)
+                 tailable
+                 slave-ok
+                 no-cursor-timeout
+                 await-data
+                 exhaust
+                 partial)
   (or query (setf query (bson)))
   (make-instance 'cursor
                  :collection collection
@@ -429,20 +457,17 @@
                  :exhaust exhaust
                  :partial partial))
 
-(defmethod find ((collection string) query
-                 &rest args &key &allow-other-keys)
-  (unless *default-connection*
-    (setf *default-connection* (connect)))
-  (ppcre:register-groups-bind (db collection) ("([^.]+)\\.(.+)" collection)
-    (apply #'find (collection (db *default-connection* db) collection) query args)))
-
-(defun find-one (collection query &optional projection)
+(api-defun find-one (collection query &optional projection)
   (let ((cursor (find collection query :projection projection :limit -1)))
     (if (next-p cursor)
         (next cursor))))
 
-(defun find-all (collection &rest args)
-  (loop with cursor = (apply #'find collection args)
+(api-defun find-all (collection
+                     query
+                     &key (skip 0) (limit 0) sort projection
+                     slave-ok)
+  (loop with cursor = (find collection query :skip skip :limit limit :sort sort
+                                             :projection projection :slave-ok slave-ok)
         while (next-p cursor)
         collect (next cursor)))
 
@@ -478,7 +503,7 @@
 (defmethod command ((collection collection) selector &rest args &key)
   (apply #'command (db collection) selector args))
 
-(defmethod count ((collection collection) query &key skip limit)
+(api-defun count (collection query &key skip limit)
   (value (command collection (apply #'bson :count (name collection)
                                     (append (if query
                                                 `(:query ,query))
@@ -525,9 +550,7 @@
   (apply #'map-reduce collection map (js reduce) args))
 
 
-(defgeneric find-and-modify (collection query &key update remove new upsert))
-
-(defmethod find-and-modify ((collection collection) query &key update remove new upsert sort fields)
+(api-defun find-and-modify (collection query &key update remove new upsert sort fields)
   (let ((bson (bson "findandmodify" (name collection)
                     "query" query)))
     (when update

@@ -3,12 +3,13 @@
   (ql:quickload :fiveam)
   (ql:quickload :info.read-eval-print.double-quote))
 
-(defpackage :info.read-eval-print.mongo.test
-  (:use :cl :info.read-eval-print.mongo :info.read-eval-print.bson :fiveam :series)
-  (:shadowing-import-from :info.read-eval-print.mongo #:count #:delete #:find)
-  (:import-from :fiveam #:def-suite*)
-  (:import-from :parenscript #:@ #:chain)
-  (:import-from :info.read-eval-print.bson #:regex))
+(info.read-eval-print.series-ext:sdefpackage
+ :info.read-eval-print.mongo.test
+ (:use :cl :info.read-eval-print.mongo :info.read-eval-print.bson :fiveam :series)
+ (:shadowing-import-from :info.read-eval-print.mongo #:count #:delete #:find)
+ (:import-from :fiveam #:def-suite*)
+ (:import-from :parenscript #:@ #:chain)
+ (:import-from :info.read-eval-print.bson #:regex))
 
 (in-package :info.read-eval-print.mongo.test)
 

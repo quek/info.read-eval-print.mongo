@@ -1,89 +1,92 @@
 ;;;; package.lisp
 
-(defpackage #:info.read-eval-print.mongo
-  (:use #:cl #:info.read-eval-print.bson #:anaphora)
-  (:shadow #:count #:delete #:find)
-  (:export #:connect
-           #:with-connection
-           #:db
-           #:collection
-           #:make-collection
-           #:insert
-           #:update
-           #:delete
-           #:find
-           #:find-one
-           #:find-all
-           #:next
-           #:next-p
-           #:alive-p
-           #:dead-p
-           #:count
+(info.read-eval-print.series-ext:sdefpackage
+ :info.read-eval-print.mongo
+ (:use #:cl #:info.read-eval-print.bson #:anaphora)
+ (:shadow #:count #:delete #:find)
+ (:export #:connect
+          #:with-connection
+          #:db
+          #:collection
+          #:make-collection
+          #:insert
+          #:update
+          #:delete
+          #:find
+          #:find-one
+          #:find-all
+          #:next
+          #:next-p
+          #:alive-p
+          #:dead-p
+          #:count
 
-           #:command
-           #:stats
+          #:command
+          #:stats
 
-           #:$add-to-set
-           #:$all
-           #:$and
-           #:$bit
-           #:$box
-           #:$center
-           #:$center-sphere
-           #:$comment
-           #:$each
-           #:$elem-match
-           #:$exists
-           #:$explain
-           #:$gt  #:$>
-           #:$gte #:$>=
-           #:$hint
-           #:$in
-           #:$inc
-           #:$isolated
-           #:$lt  #:$<
-           #:$lte #:$<=
-           #:$max
-           #:$max-distance
-           #:$max-scan
-           #:$min
-           #:$mod
-           #:$natural
-           #:$ne
-           #:$near
-           #:$near-sphere
-           #:$nin
-           #:$nor
-           #:$not
-           #:$or
-           #:$orderby
-           #:$polygon
-           #:$pop
-           #:$
-           #:$pull
-           #:$pull-all
-           #:$push
-           #:$push-all
-           #:$query
-           #:$regex
-           #:$rename
-           #:$return-key
-           #:$set
-           #:$show-disk-loc
-           #:$size
-           #:$snapshot
-           #:$type
-           #:$unique-docs
-           #:$unset
-           #:$where
-           #:$within
+          #:$add-to-set
+          #:$all
+          #:$and
+          #:$bit
+          #:$box
+          #:$center
+          #:$center-sphere
+          #:$comment
+          #:$each
+          #:$elem-match
+          #:$exists
+          #:$explain
+          #:$gt  #:$>
+          #:$gte #:$>=
+          #:$hint
+          #:$in
+          #:$inc
+          #:$isolated
+          #:$lt  #:$<
+          #:$lte #:$<=
+          #:$max
+          #:$max-distance
+          #:$max-scan
+          #:$min
+          #:$mod
+          #:$natural
+          #:$ne
+          #:$near
+          #:$near-sphere
+          #:$nin
+          #:$nor
+          #:$not
+          #:$or
+          #:$orderby
+          #:$polygon
+          #:$pop
+          #:$
+          #:$pull
+          #:$pull-all
+          #:$push
+          #:$push-all
+          #:$query
+          #:$regex
+          #:$rename
+          #:$return-key
+          #:$set
+          #:$show-disk-loc
+          #:$size
+          #:$snapshot
+          #:$type
+          #:$unique-docs
+          #:$unset
+          #:$where
+          #:$within
 
-           #:map-reduce
-           #:find-and-modify
+          #:map-reduce
+          #:find-and-modify
 
-           #:*default-connection*
+          #:*default-connection*
 
-           #:scan-mongo
+          #:scan-mongo
 
-           #:mongo-error
-           #:operation-failure))
+          #:mongo-error
+          #:operation-failure
+
+          #:def-api))

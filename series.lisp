@@ -1,23 +1,23 @@
 (in-package #:info.read-eval-print.mongo)
 
-(series::defS scan-mongo (collection
-                          query
-                          &key
-                          (skip 0)
-                          (limit 0)
-                          sort
-                          projection
-                          tailable
-                          (query-update-function (lambda (query last-value)
-                                                   (declare (ignore last-value))
-                                                   query))
-                          slave-ok)
+(api-defS scan-mongo (collection
+                      query
+                      &key
+                      (skip 0)
+                      (limit 0)
+                      sort
+                      projection
+                      tailable
+                      (query-update-function (lambda (query last-value)
+                                               (declare (ignore last-value))
+                                               query))
+                      slave-ok)
   "scan mongoDB collection."
   (series::fragl
    ;; args
    ((collection) (query) (skip) (limit) (sort) (projection) (tailable)
-                 (query-update-function)
-                 (slave-ok))
+    (query-update-function)
+    (slave-ok))
    ;; rets
    ((result t))
    ;; aux

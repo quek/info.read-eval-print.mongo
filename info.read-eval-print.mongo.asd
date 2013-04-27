@@ -3,12 +3,16 @@
 (asdf:defsystem #:info.read-eval-print.mongo
   :serial t
   :description "Describe info.read-eval-print.mongo here"
-  :author "TAHARA Yoshinori <read.eval.print@gmail.com"
+  :author "TAHARA Yoshinori <read.eval.print@gmail.com>"
   :license "BSD Licence"
   :components ((:file "package")
                (:file "condition")
                (:file "operator")
+               (:file "def-api")
                (:file "mongo")
                (:file "series"))
-  :depends-on (:info.read-eval-print.bson :iolib :parenscript :series :anaphora))
-
+  :depends-on (:info.read-eval-print.series-ext
+               :info.read-eval-print.bson
+               :iolib
+               :parenscript
+               :anaphora))
