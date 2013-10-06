@@ -515,7 +515,7 @@
 
 
 (defmethod map-reduce ((collection collection) (map javascript-code) (reduce javascript-code)
-                       &key out query sort limit finalize scope js-mode verbose)
+                       &key (out (bson :inline 1)) query sort limit finalize scope js-mode verbose)
   (let ((bson (bson "mapreduce" (name collection)
                     "map" map
                     "reduce" reduce)))
